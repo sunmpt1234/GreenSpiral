@@ -59,7 +59,7 @@
 
   <script>
     // --- ใส่ URL ที่ได้จากการ Deploy Web App ของ Google Apps Script ตรงนี้ ---
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzZmOt4r7d1pcL-jxw-0g9MdWND_uqy7C-h7pqnCRXHNFI4BYeo20kYZUecW7b-mEsd/exec"; 
+    const GAS_URL = "วาง_URL_เว็บแอปของ_GAS_ที่นี่"; 
     
     window.onload = function() {
       fetch(`${GAS_URL}?action=getClasses`)
@@ -109,13 +109,16 @@
       tbody.innerHTML = ''; 
       
       students.forEach(student => {
+        // เช็คสถานะ: ถ้าเคยเช็คชื่อว่า "มา" ไปแล้ว ให้ติ๊กถูกรอไว้เลย
+        const isChecked = (student.status === 'มา') ? 'checked' : '';
+
         const row = document.createElement('tr');
         row.className = 'student-row';
         row.innerHTML = `
           <td>${student.id}</td>
           <td>${student.title}${student.firstName} ${student.lastName} <span class="badge bg-secondary ms-1">${student.fullClass}</span></td>
           <td class="text-center">
-            <input class="form-check-input attendance-check border-success" type="checkbox" value="${student.id}" style="transform: scale(1.6);">
+            <input class="form-check-input attendance-check border-success" type="checkbox" value="${student.id}" style="transform: scale(1.6);" ${isChecked}>
           </td>
         `;
         tbody.appendChild(row);
@@ -147,11 +150,10 @@
         });
       });
 
-      // ส่งข้อมูลกลับไปบันทึกด้วย POST Request
       fetch(GAS_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8' // ใช้ text/plain เพื่อเลี่ยงปัญหา CORS
+          'Content-Type': 'text/plain;charset=utf-8' 
         },
         body: JSON.stringify({
           action: 'saveAttendance',
@@ -163,9 +165,8 @@
       .then(result => {
         if(result.success) {
           alert(result.message);
-          document.getElementById('classSelect').value = ""; 
-          document.getElementById('attendanceForm').style.display = 'none'; 
-          document.getElementById('studentTableBody').innerHTML = ''; 
+          // เมื่อบันทึกเสร็จ ให้โหลดรายชื่อใหม่เพื่อแสดงข้อมูลล่าสุด
+          loadStudents(); 
         } else {
           alert('เกิดข้อผิดพลาด: ' + result.message);
         }
