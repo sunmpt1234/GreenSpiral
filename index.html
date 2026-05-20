@@ -1,117 +1,184 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base target="_top">
   <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบเช็คชื่อสีเขียว</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background-color: #FFF9F2; font-family: 'Sarabun', sans-serif; }
-    .header { background: #FF8C00; color: white; padding: 40px 20px; text-align: center; border-radius: 0 0 30px 30px; }
-    .main-card { background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 30px; margin-top: -30px; }
-    .btn-form { background: #FF4500; color: white; border-radius: 8px; text-decoration: none; padding: 6px 15px; font-weight: bold; }
-    .btn-form:hover { background: #CC3700; color: white; }
-    .status-ok { color: #28A745; font-weight: bold; }
-    .status-no { color: #DC3545; font-weight: bold; }
-    #result-area { display: none; margin-top: 20px; }
-    .update-tag { font-size: 0.7rem; color: #ccc; margin-top: 10px; text-align: center; }
+    body { padding: 20px; font-family: 'Sarabun', sans-serif; background-color: #f8f9fa;}
+    .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 800px; }
+    .student-row { vertical-align: middle; }
+    .attendance-check { cursor: pointer; }
+    .btn-check-all { font-size: 0.85rem; padding: 0.25rem 0.5rem; margin-bottom: 5px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🔍 ค้นหาสถานะการกรอกข้อมูล</h1>
-    <p>พิมพ์รหัสนักเรียนเพื่อตรวจสอบความถูกต้อง</p>
-  </div>
+  <div class="container mx-auto mt-4">
+    <h2 class="mb-4 text-center text-success">ระบบเช็คชื่อสีเขียวนักเรียน</h2>
+    
+    <div class="row justify-content-center mb-4">
+      <div class="col-md-8">
+        <label for="classSelect" class="form-label fw-bold">เลือกระดับสายชั้น</label>
+        <select id="classSelect" class="form-select" onchange="loadStudents()">
+          <option value="">-- กำลังโหลดข้อมูล... --</option>
+        </select>
+      </div>
+    </div>
 
-  <div class="container mt-4">
-    <div class="main-card">
-      <input type="text" id="searchInput" class="form-control form-control-lg" 
-             placeholder="พิมพ์รหัสประจำตัวนักเรียน ที่นี่..." onkeyup="searchData()">
-      
-      <div id="result-area">
-        <table class="table mt-4">
-          <thead>
-            <tr style="color: #FF8C00;">
+    <div id="loading" class="text-center text-primary" style="display:none;">
+      <div class="spinner-border spinner-border-sm" role="status"></div> กำลังโหลดข้อมูล...
+    </div>
+
+    <form id="attendanceForm" style="display:none;" onsubmit="submitAttendance(event)">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted fs-6">กรุณาทำเครื่องหมายเฉพาะคนที่มา</span>
+        <div>
+          <button type="button" class="btn btn-outline-success btn-check-all" onclick="toggleAll(true)">เลือกทั้งหมด</button>
+          <button type="button" class="btn btn-outline-secondary btn-check-all" onclick="toggleAll(false)">ล้างทั้งหมด</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-striped table-hover border">
+          <thead class="table-success">
+            <tr>
               <th>รหัส</th>
+              <th>ชื่อ-สกุล</th>
               <th class="text-center">สถานะ</th>
-              <th class="text-center">ลิงก์กรอกข้อมูล</th>
             </tr>
           </thead>
-          <tbody id="table-body"></tbody>
+          <tbody id="studentTableBody">
+            <!-- ข้อมูลนักเรียนจะแสดงที่นี่ -->
+          </tbody>
         </table>
       </div>
-      
-      <div id="no-data" class="text-center mt-5 text-muted">
-        <p>ยังไม่มีการค้นหา... กรุณาพิมพ์ข้อมูลในช่องด้านบน</p>
-      </div>
-      <div class="update-tag" id="last-update">กำลังโหลดข้อมูล...</div>
-    </div>
+      <button type="submit" class="btn btn-success w-100 py-2 fs-5 fw-bold" id="submitBtn">บันทึกการเช็คชื่อ</button>
+    </form>
   </div>
 
   <script>
-    let allData = [];
-    // แก้ไขลิงก์ Google Form ของคุณที่นี่
-    const formUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeh6_WtUtf3gvquzvjEPwdfoVvRhNhNY16aMNj0l936ccl0Hw/viewform?usp=header"; 
-    // แก้ไขลิงก์ /exec ของคุณที่นี่ (ใส่เฉพาะตอนเอาไปลง GitHub)
-    const apiUrl = "https://script.google.com/macros/s/AKfycbyMcUugHpaBjmv6u19Ho56ILLRnT9L5MCdfoGzDf0e2OckFY9eKQW8Mb6gj4RBSBdqcjA/exec?type=api";
+    // --- ใส่ URL ที่ได้จากการ Deploy Web App ของ Google Apps Script ตรงนี้ ---
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzZmOt4r7d1pcL-jxw-0g9MdWND_uqy7C-h7pqnCRXHNFI4BYeo20kYZUecW7b-mEsd/exec"; 
+    
+    window.onload = function() {
+      fetch(`${GAS_URL}?action=getClasses`)
+        .then(response => response.json())
+        .then(result => {
+          if(result.success) populateClasses(result.data);
+          else alert("เกิดข้อผิดพลาดในการโหลดสายชั้น");
+        })
+        .catch(error => console.error('Error:', error));
+    };
 
-    function loadData() {
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run.withSuccessHandler(res => {
-          allData = res;
-          updateUI();
-        }).getStatusData();
-      } else {
-        fetch(apiUrl).then(r => r.json()).then(res => {
-          allData = res;
-          updateUI();
-        });
-      }
+    function populateClasses(classes) {
+      const select = document.getElementById('classSelect');
+      select.innerHTML = '<option value="">-- กรุณาเลือกระดับสายชั้น --</option>';
+      classes.forEach(c => {
+        let option = document.createElement('option');
+        option.value = c;
+        option.textContent = c;
+        select.appendChild(option);
+      });
     }
 
-    function updateUI() {
-      if(document.getElementById("searchInput").value) searchData();
-      document.getElementById('last-update').innerText = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString();
-    }
-
-    function searchData() {
-      const query = document.getElementById("searchInput").value.trim().toUpperCase();
-      const resultArea = document.getElementById("result-area");
-      const noData = document.getElementById("no-data");
-      const tableBody = document.getElementById("table-body");
-
-      if (query.length < 1) {
-        resultArea.style.display = "none";
-        noData.style.display = "block";
+    function loadStudents() {
+      const selectedClass = document.getElementById('classSelect').value;
+      if (!selectedClass) {
+        document.getElementById('attendanceForm').style.display = 'none';
         return;
       }
-
-      const filtered = allData.filter(item => item.name.toUpperCase().includes(query));
       
-      if (filtered.length > 0) {
-        resultArea.style.display = "block";
-        noData.style.display = "none";
-        tableBody.innerHTML = "";
-        filtered.forEach(item => {
-          const isDone = item.status.includes('✅');
-          const row = `<tr>
-            <td class="align-middle">${item.name}</td>
-            <td class="text-center align-middle ${isDone ? 'status-ok' : 'status-no'}">${item.status}</td>
-            <td class="text-center">
-              ${isDone ? '✔️' : `<a href="${formUrl}" target="_blank" class="btn-form">กรอก</a>`}
-            </td>
-          </tr>`;
-          tableBody.insertAdjacentHTML('beforeend', row);
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('attendanceForm').style.display = 'none';
+      
+      fetch(`${GAS_URL}?action=getStudents&grade=${selectedClass}`)
+        .then(response => response.json())
+        .then(result => {
+          if(result.success) renderStudents(result.data);
+          else alert("เกิดข้อผิดพลาดในการโหลดรายชื่อ");
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          document.getElementById('loading').style.display = 'none';
         });
-      } else {
-        tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">ไม่พบข้อมูล</td></tr>';
-      }
     }
 
-    window.onload = () => {
-      loadData();
-      setInterval(loadData, 30000); // รีเฟรชอัตโนมัติทุก 30 วินาที
-    };
+    function renderStudents(students) {
+      const tbody = document.getElementById('studentTableBody');
+      tbody.innerHTML = ''; 
+      
+      students.forEach(student => {
+        const row = document.createElement('tr');
+        row.className = 'student-row';
+        row.innerHTML = `
+          <td>${student.id}</td>
+          <td>${student.title}${student.firstName} ${student.lastName} <span class="badge bg-secondary ms-1">${student.fullClass}</span></td>
+          <td class="text-center">
+            <input class="form-check-input attendance-check border-success" type="checkbox" value="${student.id}" style="transform: scale(1.6);">
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('attendanceForm').style.display = 'block';
+    }
+
+    function toggleAll(status) {
+      const checkboxes = document.querySelectorAll('.attendance-check');
+      checkboxes.forEach(cb => cb.checked = status);
+    }
+
+    function submitAttendance(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> กำลังบันทึก...';
+
+      const selectedClass = document.getElementById('classSelect').value; 
+      const checkboxes = document.querySelectorAll('.attendance-check');
+      let attendanceData = [];
+      
+      checkboxes.forEach(cb => {
+        attendanceData.push({
+          id: cb.value,
+          status: cb.checked ? 'มา' : 'ขาด' 
+        });
+      });
+
+      // ส่งข้อมูลกลับไปบันทึกด้วย POST Request
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8' // ใช้ text/plain เพื่อเลี่ยงปัญหา CORS
+        },
+        body: JSON.stringify({
+          action: 'saveAttendance',
+          selectedGrade: selectedClass,
+          attendanceData: attendanceData
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if(result.success) {
+          alert(result.message);
+          document.getElementById('classSelect').value = ""; 
+          document.getElementById('attendanceForm').style.display = 'none'; 
+          document.getElementById('studentTableBody').innerHTML = ''; 
+        } else {
+          alert('เกิดข้อผิดพลาด: ' + result.message);
+        }
+      })
+      .catch(error => {
+        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        console.error('Error:', error);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'บันทึกการเช็คชื่อ';
+      });
+    }
   </script>
 </body>
 </html>
